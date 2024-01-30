@@ -36,7 +36,6 @@ public class SC_Pawn : MonoBehaviour
     public IEnumerator MovePawn(GameObject targetPawn, MonopolyBoard _Board)
     {
         // Debug.Log("Waiting");
-        
         if (diceResultsGotten)
         {
             diceResultsGotten = false;
@@ -48,12 +47,25 @@ public class SC_Pawn : MonoBehaviour
         SC_MonopolyLogic.Instance.unityObjects["Btn_Game_ReRoll"].SetActive(false);
         steps = dice1Number + dice2Number;
         Debug.Log("steps: "+steps);
-        SC_MonopolyLogic.Instance.unityObjects["Txt_DiceResults"].SetActive(true);
+        //SC_MonopolyLogic.Instance.unityObjects["Txt_DiceResults"].SetActive(true);
+        StartCoroutine(SC_MonopolyLogic.Instance.ShowMessage("Rolled "+dice1Number+ " and "+dice2Number));
         
         if (!targetPawn.gameObject.name.Contains(pawnColor))
         {
             Debug.LogError("Oops!!");
             yield break;
+        }
+        // enter check here if pawn is on position 40, if yes check for doubles. if doubles, proceed as usual
+        if (SC_MonopolyLogic.Instance.GetJailStatus() && (dice1Number != dice2Number))
+        {
+            //Pawn is in jail, and rolled anything other than a double
+            steps = 0;
+            boardPosition = 40;
+            SC_MonopolyLogic.Instance.ShowNotEscapedMessage();
+            //calling a logic func to show that pawn rolled something other than doubles
+        } else if (SC_MonopolyLogic.Instance.GetJailStatus() && (dice1Number == dice2Number))
+        {
+                boardPosition = 10;
         }
         
         if (isMoving)
@@ -68,7 +80,7 @@ public class SC_Pawn : MonoBehaviour
             
             boardPosition++;
             // Debug.Log("Board position is: "+boardPosition);
-            if (boardPosition > 39)
+            if ((boardPosition > 39))
             {
                 boardPosition = boardPosition - 40;
                 SC_MonopolyLogic.Instance.OnPassGo();
@@ -91,28 +103,36 @@ public class SC_Pawn : MonoBehaviour
     // ReSharper disable Unity.PerformanceAnalysis
     public IEnumerator JailPawn(GameObject _TargetPawn, MonopolyBoard _Board)
     {
-        // Debug.Log("Waiting");
-        
-        steps = 1;
+        if (diceResultsGotten)
+        {
+            diceResultsGotten = false;
+            dice1Number = 0;
+            dice2Number = 1;
+                
+        }
+        yield return new WaitUntil(() => (dice1Number == 0 && dice2Number == 1));
+        SC_MonopolyLogic.Instance.unityObjects["Btn_Game_ReRoll"].SetActive(false);
+        SC_MonopolyLogic.Instance.unityObjects["Btn_Game_ReRoll"].SetActive(false);
+        steps = dice1Number + dice2Number;
         Debug.Log("steps: "+steps);
-        SC_MonopolyLogic.Instance.unityObjects["Txt_DiceResults"].SetActive(false);
         
         if (!_TargetPawn.gameObject.name.Contains(pawnColor))
         {
-            //Debug.LogError("Oops!!");
-            yield break;
+            Debug.LogError("Oops!!");
         }
         
         if (isMoving)
         {
-            //Debug.LogError("Was moving!!");
+            // Debug.LogError("Was moving!!");
             yield break;
         }
         isMoving = true;
         
         while (steps > 0)
         {
-            Vector3 nextTile = MonopolyBoard.Instance.childTileList[30].position;
+            boardPosition = 40;
+
+            Vector3 nextTile = MonopolyBoard.Instance.childTileList[boardPosition].position;
             while (MoveToNextTile(_TargetPawn, nextTile)){yield return null;}
 
             yield return new WaitForSeconds(0.1f);
@@ -121,8 +141,6 @@ public class SC_Pawn : MonoBehaviour
         turnStartad = false;
         isMoving = false;
         diceResultsGotten = true;
-        //Debug.Log("A");
-        // here we update the position :\
         SC_MonopolyLogic.Instance.OnMovedToJail();
     }
     private bool MoveToNextTile(GameObject targetPawn, Vector3 goal)
@@ -136,7 +154,7 @@ public class SC_Pawn : MonoBehaviour
     {
         turnStartad = true;
         
-        pawnColor = SC_MonopolyLogic.Instance.unityObjects["Img_CurrentTurn"].GetComponent<Image>().sprite.name;
+        pawnColor = SC_MonopolyLogic.Instance.unityObjects["Img_Panel_Details_PawnSprite"].GetComponent<Image>().sprite.name;
         pawnColor = pawnColor.Replace("Sprite_Pawn_", string.Empty);
         currentBoard = _Board;
         boardPosition = curPosition;
@@ -145,12 +163,12 @@ public class SC_Pawn : MonoBehaviour
         
     }
 
-    public void SendToJail(MonopolyBoard _Board)
+    public void SendToJail(int curPosition, MonopolyBoard _Board, GameBoard.ColorState _Color)
     {
-        pawnColor = SC_MonopolyLogic.Instance.unityObjects["Img_CurrentTurn"].GetComponent<Image>().sprite.name;
+        pawnColor = _Color.ToString();
         pawnColor = pawnColor.Replace("Sprite_Pawn_", string.Empty);
         currentBoard = _Board;
-        boardPosition = 30;
+        boardPosition = curPosition;
         StartCoroutine(JailPawn(GameObject.Find("Pawn" + pawnColor), _Board));
     }
     #endregion

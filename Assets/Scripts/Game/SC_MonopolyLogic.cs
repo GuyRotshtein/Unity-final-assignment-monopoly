@@ -101,6 +101,10 @@ public class SC_MonopolyLogic : MonoBehaviour
         unityObjects["dice2"].SetActive(false);
         unityObjects["Btn_Game_EndTurn"].SetActive(false);
         unityObjects["Popup_TurnChange"].SetActive(false);
+        unityObjects["Popup_JailMenu"].SetActive(false);
+        unityObjects["Popup_DisplayMessage"].SetActive(false);
+        unityObjects["Popup_BuyMenu"].SetActive(false);
+        unityObjects["Popup_ManageProp"].SetActive(false);
         
         // reset all players to slot 0! --------------------------------------DONE
         gameBoard.SetPawnPosition(ColorState.Red, 0);
@@ -114,6 +118,17 @@ public class SC_MonopolyLogic : MonoBehaviour
         gameBoard.SetPawnBalance(ColorState.Green, 1500);
         gameBoard.SetPawnBalance(ColorState.Yellow, 1500);
         
+        // reset all players' "Get out of jail for free" cards count 0! --------------------------------------DONE
+        gameBoard.SetPawnJailCardCount(ColorState.Red, 0);
+        gameBoard.SetPawnJailCardCount(ColorState.Blue, 0);
+        gameBoard.SetPawnJailCardCount(ColorState.Green, 0);
+        gameBoard.SetPawnJailCardCount(ColorState.Yellow, 0);
+        
+        //reset all players' "is in jail" status to false"! --------------------------------------DONE
+        gameBoard.SetPawnInJail(ColorState.Red, false);
+        gameBoard.SetPawnInJail(ColorState.Blue, false);
+        gameBoard.SetPawnInJail(ColorState.Green, false);
+        gameBoard.SetPawnInJail(ColorState.Yellow, false);
         // reset all cards.
         
         // reset the balance text:
@@ -124,26 +139,34 @@ public class SC_MonopolyLogic : MonoBehaviour
     {
         unityObjects["Btn_Game_EndTurn"].SetActive(false);
         unityObjects["Btn_Game_RollDice"].SetActive(false);
-        if (curState == ColorState.Red)
-            curState = ColorState.Blue;
-        else if (curState == ColorState.Blue)
-            curState = ColorState.Green;
-        else if (curState == ColorState.Green)//(playerCount == 3 || playerCount == 4) && 
-            curState = ColorState.Yellow;
-        else if (curState == ColorState.Yellow)//playerCount == 4 && 
-            curState = ColorState.Red;
-        else Debug.LogError("curState is not Red, Blue, Green or Yellow (" + curState + ")");
-        
-        curView.ChangeCurTurnState(SC_GameData.Instance.GetSprite("Sprite_Pawn_" + curState.ToString()));
-        //start a function for playing a monopoly turn! VV
-        //get unityObject text that shows current turn owner's balance:
-        curView.ChangeCurTurnBalance(curState, gameBoard.GetPawnBalance(curState));
-        Debug.Log("Test 00");
-        StartCoroutine(ShowTurnChangeMessage());
-        
+        while (true)
+        {
+            // change to next pawn color. If next has less  than 0, skip to the one after it.
+            if (curState == ColorState.Red)
+                curState = ColorState.Blue;
+            else if (curState == ColorState.Blue)
+                curState = ColorState.Green;
+            else if (curState == ColorState.Green) //(playerCount == 3 || playerCount == 4) && 
+                curState = ColorState.Yellow;
+            else if (curState == ColorState.Yellow) //playerCount == 4 && 
+                curState = ColorState.Red;
+            else
+                Debug.LogError("curState is not Red, Blue, Green or Yellow (" + curState + ")");
+
+            curView.ChangeCurTurnState(SC_GameData.Instance.GetSprite("Sprite_Pawn_" + curState.ToString()));
+            //get unityObject text that shows current turn owner's balance:
+            curView.ChangeCurTurnBalance(curState, gameBoard.GetPawnBalance(curState));
+            //Debug.Log("Test 00");
+            if (gameBoard.GetPawnBalance(curState) < 0)
+            {
+                continue;
+            }
+            break;
+        }
+        StartCoroutine(gameBoard.GetPawnInJail(curState) == 0 ? ShowTurnChangeMessage(false) : ShowTurnChangeMessage(true));
     }
 
-    
+
     // function for updating pawn position. Used to continue turn:
     public void SetPositionLogic(int _PawnBoardPosition, int _DiceResult)
     {
@@ -159,105 +182,72 @@ public class SC_MonopolyLogic : MonoBehaviour
         //taking action based on the type of tile the pawn landed on
         if (_PawnBoardPosition == 0)
         {
-            Debug.Log("Congrats!! you landed on ''GO'' and got paid 200$");
+            // Debug.Log("Congrats!! you landed on ''GO'' and got paid 200$");
+            StartCoroutine(ShowMessage("Congrats!! you landed on ''GO'' and got paid 200$"));
             gameBoard.SetPawnBalance(curState,
                 curPawnBalance + 200);
             
-        } else if (_PawnBoardPosition == 30){
-            Debug.Log("Congrats!! you landed on slot 30 and get to GO TO JAIL! don't drop the soap mate ;)");
-            pawnController.SendToJail(monopolyBoard);
-            
+        } else if (_PawnBoardPosition == 30)
+        {
+            StartCoroutine(ShowMessage(curState + " pawn landed on tile 30 and was sent to jail."));
+            SendToJail(curState);
         } else if (_PawnBoardPosition == 10 || _PawnBoardPosition == 20)
         {
             Debug.Log("Free Parking? in this day and age? unbelievable!");
-        }
+        } 
         else if (curSlotType == SlotState.Empty){
-            //display a message asking if you wanna buy; for now automatically say yes
-            if (curPawnBalance - SC_GameData.Instance.GetSlotPrice(_PawnBoardPosition) > 0)
+            //Open the buy menu function:
+            if (curPawnBalance - SC_GameData.Instance.GetSlotPrice(_PawnBoardPosition) >= 0)
             {
                 // ask if u want to buy.
-                Debug.Log("Buying the house for you man!");
-                gameBoard.SetPawnBalance(curState, curPawnBalance - SC_GameData.Instance.GetSlotPrice(_PawnBoardPosition));
-                // if it's a special company, we set it to "Owned"+the pawn's color.
-                if (_PawnBoardPosition == 5 || _PawnBoardPosition == 12 || _PawnBoardPosition == 15 || _PawnBoardPosition == 25 || _PawnBoardPosition == 28 || _PawnBoardPosition == 35)
-                {
-                    switch (curState)
-                    {
-                        case ColorState.Red:
-                        {
-                            // add call to function that changes the fucking slot image here
-                            UpdateSlotIcon(gameBoard.GetPawnPosition(curState), SlotState.OwnedRed);
-                            break;
-                        }
-                        case ColorState.Blue:
-                        {
-                            gameBoard.SetSlotState(gameBoard.GetPawnPosition(curState),SlotState.OwnedBlue);
-                            break;
-                        }
-                        case ColorState.Green:
-                        {
-                            gameBoard.SetSlotState(gameBoard.GetPawnPosition(curState),SlotState.OwnedGreen);
-                            break;
-                        }
-                        case ColorState.Yellow:
-                        {
-                            gameBoard.SetSlotState(gameBoard.GetPawnPosition(curState),SlotState.OwnedYellow);
-                            break;
-                        }
-                    }
-                }
-                else
-                {
-                    switch (curState)
-                    {
-                        case ColorState.Red:
-                        {
-                            UpdateSlotIcon(gameBoard.GetPawnPosition(curState), SlotState.HouseRed);
-                            gameBoard.SetSlotHouses(gameBoard.GetPawnPosition(curState), 0);
-                            break;
-                        }
-                        case ColorState.Blue:
-                        {
-                            UpdateSlotIcon(gameBoard.GetPawnPosition(curState), SlotState.HouseBlue);
-                            gameBoard.SetSlotHouses(gameBoard.GetPawnPosition(curState), 0);
-                            break;
-                        }
-                        case ColorState.Green:
-                        {
-                            UpdateSlotIcon(gameBoard.GetPawnPosition(curState), SlotState.HouseGreen);
-                            gameBoard.SetSlotHouses(gameBoard.GetPawnPosition(curState), 0);
-                            break;
-                        }
-                        case ColorState.Yellow:
-                        {
-                            UpdateSlotIcon(gameBoard.GetPawnPosition(curState), SlotState.HouseYellow);
-                            gameBoard.SetSlotHouses(gameBoard.GetPawnPosition(curState), 0);
-                            break;
-                        }
-                    }
-                }
+                //Edit Txt_Popup_BuyMenu_WantToBuy to include the property's name, edit Txt_Popup_BuyMenu_Details 's details
+                unityObjects["Txt_Popup_BuyMenu_WantToBuy"].GetComponent<TMPro.TextMeshProUGUI>().text = "Do you want to buy "+SC_GameData.Instance.GetPropName(gameBoard.GetPawnPosition(curState))+"?";
+                //IF to decide what set to designate the tile to
+                unityObjects["Txt_Popup_BuyMenu_Details"].GetComponent<TMPro.TextMeshProUGUI>().text = 
+                    SC_GameData.Instance.GetSlotPrice(_PawnBoardPosition).ToString()+"₩\n"
+                    +SC_GameData.Instance.GetSlotSet(_PawnBoardPosition)+"\n"
+                    +SC_GameData.Instance.GetSlotRentBasic(_PawnBoardPosition)+"₩\n"
+                    +SC_GameData.Instance.GetSlotRentSameColor(_PawnBoardPosition)+"₩\n"
+                    +SC_GameData.Instance.GetSlotRentHotel(_PawnBoardPosition)+"₩"
+                    ;
                 
-                Debug.Log("Bought the house for you my man! now you got "+gameBoard.GetPawnBalance(curState)+"$.");
-                
-                // end this function, start another on click
+                unityObjects["Popup_BuyMenu"].SetActive(true);
             }
             else
             {
                 Debug.Log("Oops: not enough money. Better luck next time....");
-                // display message that he's fucking poooooooooooooooor and can't buy shit
+                // display message that he's f*cking poor and can't buy shit
                 //continue to next turn
             }
             
         } else if (curSlotType == SlotState.CommunityChest){
             // take a community chest card and do what it says
             Debug.Log("Community Chest card");
+
+            SendToJail(curState);
+
         } else if (curSlotType == SlotState.Chance){
             // take a chance card and do what it says
             Debug.Log("Chance card");
+            SendToJail(curState);
+
         } else if (curSlotType == SlotState.Error){
             // here we cry an error because fuck
         } else if (curSlotType.ToString().Contains(curState.ToString())){
-            Debug.Log("Hey! you landed on your own place! how nice ;)");
+            //User has landed on a building owned by himself.
+            //get details about tile, update Popup_ManageProp
+            //Edit Txt_Popup_ManageProp_Propname to include the property's name
+            unityObjects["Txt_Popup_ManageProp_PropName"].GetComponent<TMPro.TextMeshProUGUI>().text = SC_GameData.Instance.GetPropName(gameBoard.GetPawnPosition(curState));
+            //Updating property's details
+            unityObjects["Txt_Popup_ManageProp_Details"].GetComponent<TMPro.TextMeshProUGUI>().text = 
+                // SC_GameData.Instance.GetSlotPrice(_PawnBoardPosition).ToString()+"₩\n"
+                SC_GameData.Instance.GetSlotSet(_PawnBoardPosition)+"\n \n"
+                +GetRent(_PawnBoardPosition,_DiceResult)+"₩\n \n"
+                +(SC_GameData.Instance.GetSlotPrice(_PawnBoardPosition) / 2)+"₩"
+                ;
+                
+            unityObjects["Popup_ManageProp"].SetActive(true);
+            //Debug.Log("Hey! you landed on your own place! how nice ;)");
             // i.e. red house / hotel when you're the red pawn
             // see if you got all the properties in the same color group from sc_gamedata.instance
             if ((_PawnBoardPosition == 1 || _PawnBoardPosition == 3) && gameBoard.GetGroupOwner("brown") == curState)
@@ -297,27 +287,163 @@ public class SC_MonopolyLogic : MonoBehaviour
             
         } else if (curSlotType == SlotState.Tax)
         {
-            Debug.Log("Owch! you landed on a tax slot.. better luck next time");
-            // take his money, check if he's bankrupt
+            // Deducting the tax from the pawn's balance, and checking if he's bankrupt afterwards
             if (SC_GameData.Instance.GetSlotTax(_PawnBoardPosition) == -999)
             {
-                Debug.LogError("OOPS! SOMETHING WENT WRONG!!!!!");
-                
+                Debug.LogError("ERROR: Failed to get tax value for specified slot.");
             }
             else
             {
                 gameBoard.SetPawnBalance(curState,curPawnBalance - SC_GameData.Instance.GetSlotTax(_PawnBoardPosition));
-                if (gameBoard.GetPawnBalance(curState) < 0)
+                if (gameBoard.GetPawnBalance(curState) >= 0)
+                {
+                    StartCoroutine(ShowMessage(curState+ " pawn landed on a tax tile, and had to pay "+SC_GameData.Instance.GetSlotTax(_PawnBoardPosition)+"₩. \nRemaining balance: "+gameBoard.GetPawnBalance(curState)+"₩"));
+                    unityObjects["Btn_Game_EndTurn"].SetActive(true);
+                }
+                else
                 {
                     Debug.Log("Tough luck! You're out!!!");
-                    // add a function here yo free all of his houses!
+                    // add a function here yo free all of his houses! or something >_>
                 }
+                
             }
             
         }  else {
-            //Debug.Log("Now to pay rent! just kidding, I didn't implement that yet, you lucky bastard...");
             // landed on someone else's property, i.e.: red pawn on yellow house
             ColorState propertyOwner = ColorState.None;
+            if (gameBoard.GetSlotState(_PawnBoardPosition).ToString().Contains("Red"))
+            {
+                propertyOwner = ColorState.Red;
+            }else if (gameBoard.GetSlotState(_PawnBoardPosition).ToString().Contains("Green"))
+            {
+                propertyOwner = ColorState.Green;
+            }
+            else if (gameBoard.GetSlotState(_PawnBoardPosition).ToString().Contains("Blue"))
+            {
+                propertyOwner = ColorState.Blue;
+            }
+            else if (gameBoard.GetSlotState(_PawnBoardPosition).ToString().Contains("Yellow"))
+            {
+                propertyOwner = ColorState.Yellow;
+            }
+            
+            int rentSum = GetRent(_PawnBoardPosition, _DiceResult);
+            //Debug.Log("Rent owed is: "+rentSum);
+            gameBoard.SetPawnBalance(curState, gameBoard.GetPawnBalance(curState) - rentSum);
+            gameBoard.SetPawnBalance(propertyOwner, gameBoard.GetPawnBalance(propertyOwner) + rentSum);
+            StartCoroutine(ShowMessage(curState.ToString() + " Pawn landed on "+propertyOwner.ToString()+"'s property, and had to pay "+rentSum+"₩."));
+            //Debug.Log("Rent was paid! "+curState+ " pawn has "+gameBoard.GetPawnBalance(curState)+"₩ left. \n"+propertyOwner.ToString()+" pawn now has "+gameBoard.GetPawnBalance(propertyOwner)+"₩.");
+            if (gameBoard.GetPawnBalance(curState) < 0)
+            {
+                
+                Debug.Log("Tough luck! You're out!!!");
+                // add a function here yo free all of his houses! or something >_>
+            }
+            else
+            {
+                unityObjects["Btn_Game_EndTurn"].SetActive(true);
+            }
+        }
+        unityObjects["Txt_DiceResults"].SetActive(false);
+        unityObjects["dice1"].SetActive(false);
+        unityObjects["dice2"].SetActive(false);
+        //check winners? NO - DO IN CLIKING FUNCTION YOU DOLT
+        if (gameBoard.IsMatchOver() == WinnerState.Winner)
+        {
+            Debug.Log("winner: curview");
+            //display win screen, including back to menu button and rematch button!!!
+        }
+        else
+        {
+            Debug.Log("darn. no winner yet...");
+            //if pawn isn't in jail, show the "End turn" button
+            if (gameBoard.GetPawnInJail(curState) != 1 && _PawnBoardPosition != 40)
+            {
+                //unityObjects["Btn_Game_EndTurn"].SetActive(true);
+            }
+        }
+    }
+
+    private void UpdateSlotIcon(int _Index, SlotState _NewState)
+    {
+        // Debug.Log("OnUpdateSlotIcon  "  + _Index);
+        if (gameBoard.GetSlotState(_Index) == GameBoard.SlotState.Empty &&
+            unityObjects.ContainsKey("Slot" + _Index))
+        {
+            // Debug.Log("Empty");
+            SC_Slot _curSlot = unityObjects["Slot" + _Index].GetComponent<SC_Slot>();
+            if (_curSlot != null)
+            {
+                gameBoard.SetSlotState(_Index, _NewState);
+
+                // Debug.Log("Changing.");
+                _curSlot.ChangeSlotState(_NewState);
+                //ChangeTurn();
+            }
+        }
+    }
+    
+    IEnumerator ShowTurnChangeMessage (bool _IsInJail) {
+        //Debug.Log("Test 11");
+        unityObjects["Txt_Popup_TurnChange_PawnName"].GetComponent<TMPro.TextMeshProUGUI>().text = curState.ToString()+" Pawn's Turn";
+        unityObjects["Popup_TurnChange"].SetActive(true);
+        yield return new WaitForSeconds(2);
+        unityObjects["Popup_TurnChange"].SetActive(false);
+        if (!_IsInJail)
+        {
+            unityObjects["Btn_Game_RollDice"].SetActive(true);
+        }
+        else
+        {
+            unityObjects["Txt_Popup_JailMenu_JailedPawnName"].GetComponent<TMPro.TextMeshProUGUI>().text = curState.ToString()+" Pawn is still in jail,";
+            unityObjects["Popup_JailMenu"].SetActive(true);
+        }
+    }
+    
+    public IEnumerator ShowMessage (string _Message) {
+        unityObjects["Txt_Popup_DisplayMessage_MessageText"].GetComponent<TMPro.TextMeshProUGUI>().text = _Message;
+        unityObjects["Popup_DisplayMessage"].SetActive(true);
+        yield return new WaitForSeconds(2);
+        unityObjects["Popup_DisplayMessage"].SetActive(false);
+    }
+
+    public void ShowNotEscapedMessage()
+    {
+        StartCoroutine(ShowMessage("Pawn didn't roll doubles, so he's still in jail"));
+        unityObjects["Btn_Game_EndTurn"].SetActive(true);
+    }
+
+    private void SendToJail(ColorState _Color)
+    {
+        // just  Y E E T
+        int pawnPrevPosition = gameBoard.GetPawnPosition(_Color);
+        if (pawnPrevPosition != -999)
+        {
+            //Debug.Log("Pawn: "+_Color.ToString()+", Position on board: "+ (pawnPrevPosition + 1));
+            gameBoard.SetPawnPosition(_Color, 40);
+            pawnController.SendToJail(pawnPrevPosition, monopolyBoard,_Color);
+        }
+        else
+        {
+            Debug.LogError("Pawn's given position not found!");
+        }
+    }
+
+    public bool GetJailStatus()
+    {
+        if (gameBoard.GetPawnInJail(curState) == 1)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    private int GetRent(int _PawnBoardPosition, int _DiceResult)
+    {
+        ColorState propertyOwner = ColorState.None;
             if (gameBoard.GetSlotState(_PawnBoardPosition).ToString().Contains("Red"))
             {
                 propertyOwner = ColorState.Red;
@@ -399,62 +525,32 @@ public class SC_MonopolyLogic : MonoBehaviour
                         rentSum = SC_GameData.Instance.GetSlotRentHotel(_PawnBoardPosition);
                         break;
                 }
-                Debug.Log("Rent owed is: "+rentSum);
-                
-                gameBoard.SetPawnBalance(curState, curPawnBalance - rentSum);
-                gameBoard.SetPawnBalance(propertyOwner, gameBoard.GetPawnBalance(propertyOwner) + rentSum);
-                Debug.Log("Rent was paid! you have "+gameBoard.GetPawnBalance(curState)+"₩ left! "+propertyOwner.ToString()+" pawn now has "+gameBoard.GetPawnBalance(propertyOwner)+"₩.");
             }
-        }
-        //check winners?
-        //START IFs
-        Debug.Log("Changing turn now!"); // need to change this to a button or a timer or smthn (doing both is the best but also longest)
-        unityObjects["Txt_DiceResults"].SetActive(false);
-        unityObjects["dice1"].SetActive(false);
-        unityObjects["dice2"].SetActive(false);
-        //ChangeTurn();
-        unityObjects["Btn_Game_EndTurn"].SetActive(true);
+
+            return rentSum;
     }
 
-    private void UpdateSlotIcon(int _Index, SlotState _NewState)
-    {
-        // Debug.Log("OnUpdateSlotIcon  "  + _Index);
-        if (gameBoard.GetSlotState(_Index) == GameBoard.SlotState.Empty &&
-            unityObjects.ContainsKey("Slot" + _Index))
-        {
-            // Debug.Log("Empty");
-            SC_Slot _curSlot = unityObjects["Slot" + _Index].GetComponent<SC_Slot>();
-            if (_curSlot != null)
-            {
-                gameBoard.SetSlotState(_Index, _NewState);
-
-                // Debug.Log("Changing.");
-                _curSlot.ChangeSlotState(_NewState);
-                //ChangeTurn();
-            }
-        }
-    }
-    
-    IEnumerator ShowTurnChangeMessage () {
-        Debug.Log("Test 11");
-        unityObjects["Txt_Popup_TurnChange_PawnName"].GetComponent<TMPro.TextMeshProUGUI>().text = curState.ToString()+" Pawn's Turn";
-        unityObjects["Popup_TurnChange"].SetActive(true);
-        yield return new WaitForSeconds(2);
-        unityObjects["Popup_TurnChange"].SetActive(false);
-        unityObjects["Btn_Game_RollDice"].SetActive(true);
-    }
-    
     #endregion
     
     #region Events
 
     public void OnMovedToJail()
     {
+        
+        // this is called after you're moved to the jail cell :>
+        if (!gameBoard.SetPawnInJail(curState, true))
+        {
+            Debug.Log("ERROR: CANNOT MOVE USER TO JAIL!");
+        }
+        
         if (!gameBoard.SetPawnPosition(curState, 10))
         {
             Debug.LogError("Error: Could not update thingy :( to jail");
         }
         Debug.Log("Moved to jail here!");
+        StartCoroutine(ShowMessage(curState.ToString() + " Pawn was moved to jail."));
+        //now we show the end turn button
+        unityObjects["Btn_Game_EndTurn"].SetActive(true);
     }
 
     public void OnPassGo()
@@ -476,6 +572,7 @@ public class SC_MonopolyLogic : MonoBehaviour
         unityObjects["dice1"].transform.position = new Vector3 (1000, 1000 ,-3);
         unityObjects["dice2"].transform.position = new Vector3 (1000, 1000 ,-3);
         unityObjects["Btn_Game_ReRoll"].SetActive(true);
+        unityObjects["Popup_JailMenu"].SetActive(false);
         // set dice to visible
         
         
@@ -562,6 +659,151 @@ public class SC_MonopolyLogic : MonoBehaviour
             Debug.LogError("Pawn's given not found!");
         }
     }
+
+    private void OnJailRoll()
+    {
+        //roll dices. if user rolls a double, advance. If not, end his turn.
+        OnRollDice();
+    }
+
+    private void OnJailPay()
+    {
+        // check pawn's balance
+        if (gameBoard.GetPawnBalance(curState) >= 50)
+        {
+            //deduct 50$ from pawn's balance
+            gameBoard.SetPawnBalance(curState, (gameBoard.GetPawnBalance(curState) - 50));
+            // change pawn's position to slot 10, only in gameboard. don't need to move him, he'll move by next turn
+            gameBoard.SetPawnPosition(curState, 10);
+            // change pawn's jail status to false
+            gameBoard.SetPawnInJail(curState, false);
+            
+            //hiding jail menu, and showing "end turn" button
+            unityObjects["Popup_JailMenu"].SetActive(false);
+            //show message confirming change.
+            StartCoroutine(ShowMessage(curState.ToString() + " pawn payed 50₩, and will move out of jail in the next round"));
+            
+            unityObjects["Btn_Game_EndTurn"].SetActive(true);
+        }
+        else
+        {
+            StartCoroutine(ShowMessage(curState.ToString() + " pawn has less than 50₩ left, and thus they can't  exit jail. Try another option"));
+        }
+    }
+    
+    private void OnJailUseCard()
+    {
+        // check if pawn got any "get out of jail free" cards
+        if (gameBoard.GetPawnJailCardCount(curState) > 0)
+        {
+            //remove one of the pawn's cards
+            gameBoard.SetPawnJailCardCount(curState, (gameBoard.GetPawnJailCardCount(curState) - 1));
+            // change pawn's position to slot 10, only in gameboard. don't need to move him, he'll move by next turn
+            gameBoard.SetPawnPosition(curState, 10);
+            // change pawn's jail status to false
+            gameBoard.SetPawnInJail(curState, false);
+            
+            //hiding jail menu, and showing "end turn" button
+            unityObjects["Popup_JailMenu"].SetActive(false);
+            //show message confirming change.
+            StartCoroutine(ShowMessage(curState.ToString() + " pawn used one of his ''Get out of jail free'' cards, and will move out of jail in the next round"));
+            
+            unityObjects["Btn_Game_EndTurn"].SetActive(true);
+        }
+        else
+        {
+            StartCoroutine(ShowMessage(curState.ToString() + " pawn has no ''Get out of jail free'' cards left, and thus they can't exit jail yet. Try another option"));
+        }
+    }
+
+    private void OnBuyMenuYes()
+    {
+        var curPawnBalance = gameBoard.GetPawnBalance(curState);
+        var pawnBoardPosition = gameBoard.GetPawnPosition(curState);
+        if (curPawnBalance - SC_GameData.Instance.GetSlotPrice(pawnBoardPosition) >= 0)
+        {
+            gameBoard.SetPawnBalance(curState, curPawnBalance - SC_GameData.Instance.GetSlotPrice(pawnBoardPosition));
+            // if it's a railway or utility company, set it to "Owned"+the pawn's color.
+            if (pawnBoardPosition == 5 || pawnBoardPosition == 12 || pawnBoardPosition == 15 || pawnBoardPosition == 25 || pawnBoardPosition == 28 || pawnBoardPosition == 35)
+            {
+                switch (curState)
+                {
+                    case ColorState.Red:
+                    {
+                        // add call to function that changes the fucking slot image here
+                        UpdateSlotIcon(gameBoard.GetPawnPosition(curState), SlotState.OwnedRed);
+                        break;
+                    }
+                    case ColorState.Blue:
+                    {
+                        gameBoard.SetSlotState(gameBoard.GetPawnPosition(curState),SlotState.OwnedBlue);
+                        break;
+                    }
+                    case ColorState.Green:
+                    {
+                        gameBoard.SetSlotState(gameBoard.GetPawnPosition(curState),SlotState.OwnedGreen);
+                        break;
+                    }
+                    case ColorState.Yellow:
+                    {
+                        gameBoard.SetSlotState(gameBoard.GetPawnPosition(curState),SlotState.OwnedYellow);
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                switch (curState)
+                {
+                    case ColorState.Red:
+                    {
+                        UpdateSlotIcon(gameBoard.GetPawnPosition(curState), SlotState.HouseRed);
+                        gameBoard.SetSlotHouses(gameBoard.GetPawnPosition(curState), 0);
+                        break;
+                    }
+                     case ColorState.Blue:
+                    {
+                        UpdateSlotIcon(gameBoard.GetPawnPosition(curState), SlotState.HouseBlue);
+                        gameBoard.SetSlotHouses(gameBoard.GetPawnPosition(curState), 0);
+                        break;
+                    }
+                    case ColorState.Green:
+                    {
+                        UpdateSlotIcon(gameBoard.GetPawnPosition(curState), SlotState.HouseGreen);
+                        gameBoard.SetSlotHouses(gameBoard.GetPawnPosition(curState), 0);
+                        break;
+                    }
+                    case ColorState.Yellow:
+                    {
+                        UpdateSlotIcon(gameBoard.GetPawnPosition(curState), SlotState.HouseYellow);
+                        gameBoard.SetSlotHouses(gameBoard.GetPawnPosition(curState), 0);
+                        break;
+                    }
+                }
+            }
+            StartCoroutine(ShowMessage(curState +" pawn has bought "+SC_GameData.Instance.GetPropName(gameBoard.GetPawnPosition(curState))+"\n Remaining balance: "+gameBoard.GetPawnBalance(curState)+"₩"));
+    
+            // Debug.Log("Bought the house for you my man! now you got "+gameBoard.GetPawnBalance(curState)+"$.");
+               // hiding buy panel, show end turn button 
+               unityObjects["Popup_BuyMenu"].SetActive(false);
+               unityObjects["Btn_Game_EndTurn"].SetActive(true);
+        }
+        else
+        {
+            StartCoroutine(ShowMessage("You do not have enough money to buy "+SC_GameData.Instance.GetPropName(gameBoard.GetPawnPosition(curState))+"\n Your balance: "+gameBoard.GetPawnBalance(curState)+"₩"));
+
+            Debug.Log("Oops: not enough money. Better luck next time....");
+            // display message that he's f*cking poor and can't buy shit
+            //continue to next turn
+        }
+    }
+
+    private void OnBuyMenuNo()
+    {
+        //closing buy menu and showing "end turn"
+        unityObjects["Popup_BuyMenu"].SetActive(false);
+        unityObjects["Btn_Game_EndTurn"].SetActive(true);
+    }
     
     #endregion
     
@@ -595,5 +837,30 @@ public class SC_MonopolyLogic : MonoBehaviour
     {
         OnReRoll();
     }
+
+    public void Btn_JailMenu_Roll()
+    {
+        OnJailRoll();
+    }
+    
+    public void Btn_JailMenu_Pay()
+    {
+        OnJailPay();
+    }
+    
+    public void Btn_JailMenu_UseCard()
+    {
+        OnJailUseCard();
+    }
+
+    public void Btn_BuyMenu_Yes()
+    {
+        OnBuyMenuYes();
+    }
+    public void Btn_BuyMenu_No()
+    {
+        OnBuyMenuNo();
+    }
+    
     #endregion
 }

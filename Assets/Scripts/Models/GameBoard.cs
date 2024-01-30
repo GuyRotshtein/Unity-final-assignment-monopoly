@@ -27,6 +27,8 @@ public class GameBoard
     private List<SlotState> board;
     private Dictionary<ColorState,int> pawnPositions;
     private Dictionary<ColorState,int> pawnBalances;
+    private Dictionary<ColorState,int> pawnJailCards;
+    private Dictionary<ColorState,bool> pawnInJail;
     private Dictionary<int, int> SlotHouseCount;
     private Transform[] childObjects;
     private Dictionary<int,ColorState> specialSlotOwners;
@@ -78,6 +80,20 @@ public class GameBoard
             {ColorState.Blue, 0},
             {ColorState.Green, 0},
             {ColorState.Yellow, 0},
+        };
+        pawnJailCards = new Dictionary<ColorState, int>()
+        {
+            {ColorState.Red, 0},
+            {ColorState.Blue, 0},
+            {ColorState.Green, 0},
+            {ColorState.Yellow, 0},
+        };
+        pawnInJail = new Dictionary<ColorState, bool>()
+        {
+            {ColorState.Red, false},
+            {ColorState.Blue, false},
+            {ColorState.Green, false},
+            {ColorState.Yellow, false},
         };
         SlotHouseCount = new Dictionary<int, int>()
         {
@@ -252,6 +268,52 @@ public class GameBoard
             ColorGroupOwners[key] = ColorState.None;
         }
     }
+
+    public int GetPawnJailCardCount(ColorState _Pawn)
+    {
+        if (pawnJailCards.ContainsKey(_Pawn))
+        {
+            return pawnJailCards[_Pawn];
+        }
+
+        return -999;
+    }
+
+    public bool SetPawnJailCardCount(ColorState PawnColor, int NewBalance)
+    {
+        if (pawnJailCards.ContainsKey(PawnColor))
+        {
+            pawnJailCards[PawnColor] = NewBalance;
+            return true;
+        }
+        return false;
+    }
+    
+    public int GetPawnInJail(ColorState _Pawn)
+    {
+        if (pawnBalances.ContainsKey(_Pawn))
+        {
+            if (pawnInJail[_Pawn])
+            {
+                return 1;
+            }
+            else
+            {
+                return 0;
+            }
+        }
+        return -9999;
+    }
+    
+    public bool SetPawnInJail(ColorState PawnColor, bool NewState)
+    {
+        if (pawnBalances.ContainsKey(PawnColor))
+        {
+            pawnInJail[PawnColor] = NewState;
+            return true;
+        }
+        return false;
+    }
     
     public override string ToString()
     {
@@ -264,24 +326,25 @@ public class GameBoard
     
     public WinnerState IsMatchOver()
     {
-        //if(CheckWinner(0, 1, 2) || CheckWinner(3, 4, 5) || CheckWinner(6, 7, 8) ||
-           //CheckWinner(0, 3, 6) || CheckWinner(1, 4, 7) || CheckWinner(2, 5, 8) ||
-           //CheckWinner(0, 4, 8) || CheckWinner(2, 4, 6))
-            //return WinnerState.Winner;
+        if (CheckWinner(ColorState.Red) || CheckWinner(ColorState.Blue) || CheckWinner(ColorState.Yellow) || CheckWinner(ColorState.Green))
+        {
+            return WinnerState.Winner;
+        }
 
-        //if (moveCount == maxSlots)
-            //return WinnerState.Tie;
-
-        //return WinnerState.NoWinner;
         return WinnerState.NoWinner;
     }
-
-    private bool CheckWinner(int _Index01, int _Index02, int _Index03)
+    
+    private bool CheckWinner(ColorState _Color)
     {
-        if (board[_Index01] != SlotState.Empty && board[_Index01] == board[_Index02] 
-            && board[_Index02] == board[_Index03])
-            return true;
-        return false;
+        // check balances, for all if (colorstate != _Color && balance >= 0) return false
+        foreach (var _Pawncolor in pawnBalances)
+        {
+            if ((_Pawncolor.Key != _Color) && (GetPawnBalance(_Pawncolor.Key) >= 0))
+            {
+                return false;
+            }
+        }
+        return true;
     }
     
     #endregion

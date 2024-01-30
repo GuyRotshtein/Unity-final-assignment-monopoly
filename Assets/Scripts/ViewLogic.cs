@@ -13,7 +13,6 @@ public class ViewLogic
     {
         if (_NewSprite != null)
         {
-            SC_MonopolyLogic.Instance.unityObjects["Img_CurrentTurn"].GetComponent<Image>().sprite = _NewSprite;
             SC_MonopolyLogic.Instance.unityObjects["Img_Popup_TurnChange_PawnSprite"].GetComponent<Image>().sprite = _NewSprite;
             SC_MonopolyLogic.Instance.unityObjects["Img_Panel_Details_PawnSprite"].GetComponent<Image>().sprite = _NewSprite;
             
@@ -23,7 +22,13 @@ public class ViewLogic
 
     public void ChangeCurTurnBalance(ColorState _PawnColor, int _NewBalance)
     {
-        SC_MonopolyLogic.Instance.unityObjects["Txt_Game_Balance"].GetComponent<TMPro.TextMeshProUGUI>().text =
-            _PawnColor.ToString() + "'s Balance: " + _NewBalance + "₩";
+        SC_MonopolyLogic.Instance.unityObjects["Txt_Panel_Details_PawnBalance"].GetComponent<TMPro.TextMeshProUGUI>().text =
+            _NewBalance + "₩";
+    }
+
+    public void ChangeCurTurnJail(ColorState _PawnColor)
+    {
+        SC_MonopolyLogic.Instance.unityObjects["Txt_Popup_JailMenu_JailedPawnName"].GetComponent<TMPro.TextMeshProUGUI>().text =
+            _PawnColor.ToString() + " pawn is in jail!";
     }
 }

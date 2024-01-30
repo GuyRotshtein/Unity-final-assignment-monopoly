@@ -51,4 +51,29 @@ public class SC_GameController : MonoBehaviour
         if (curMenuLogic != null)
             SC_MonopolyLogic.Instance.Btn_Game_EndTurn();
     }
+
+    public void Btn_JailMenu_Roll()
+    {
+        SC_MonopolyLogic.Instance.Btn_JailMenu_Roll();
+    }
+    
+    public void Btn_JailMenu_Pay()
+    {
+        SC_MonopolyLogic.Instance.Btn_JailMenu_Pay();
+    }
+    
+    public void Btn_JailMenu_UseCard()
+    {
+        SC_MonopolyLogic.Instance.Btn_JailMenu_UseCard();
+    }
+
+    public void Btn_BuyMenu_Yes()
+    {
+        SC_MonopolyLogic.Instance.Btn_BuyMenu_Yes();
+    }
+    
+    public void Btn_BuyMenu_No()
+    {
+        SC_MonopolyLogic.Instance.Btn_BuyMenu_No();
+    }
 }
